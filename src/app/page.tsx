@@ -1,59 +1,47 @@
-'use client'
+import Link from 'next/link'
+import { createClient } from '@/lib/supabase/server'
+import { getRestaurants } from '@/lib/actions/restaurant'
+import Header from '@/components/layout/Header'
+import FoodIcons from '@/components/features/FoodIcons'
+import type { RestaurantWithStats } from '@/types'
 
-import { useEffect } from 'react'
+const CATEGORIES = ['전체', '한식', '중식', '일식', '분식', '카페', '양식', '기타']
 
-export default function FoodIcons() {
-  useEffect(() => {
-    const foods = ['🍜','☕','🍱','🍢','🍝','🍕','🍣','🧋','🥗','🥐','🍰','🍛','🌮','🍔','🍙','🧆']
-    const positions = [
-      {top:'6%',left:'4%'},{top:'12%',right:'5%'},
-      {top:'22%',left:'2%'},{top:'18%',left:'55%'},
-      {top:'35%',right:'3%'},{top:'42%',left:'8%'},
-      {top:'55%',right:'6%'},{top:'60%',left:'3%'},
-      {top:'70%',left:'50%'},{top:'72%',right:'4%'},
-      {top:'82%',left:'6%'},{top:'85%',right:'7%'},
-      {top:'3%',left:'28%'},{top:'48%',left:'45%'},
-      {top:'30%',left:'22%'},{top:'65%',left:'30%'},
-    ]
-    const container = document.getElementById('food-icons')
-    if (!container) return
-    const icons: HTMLSpanElement[] = []
-    positions.forEach((p: {top?:string,left?:string,right?:string}, i) => {
-      const el = document.createElement('span')
-      const dur = (4.5 + Math.random() * 4).toFixed(1)
-      const delay = (Math.random() * 8).toFixed(1)
-      const size = (18 + Math.random() * 14).toFixed(0)
-      el.style.cssText = `position:absolute;font-size:${size}px;line-height:1;opacity:0;animation:foodFloatGlow ${dur}s ease-in-out infinite;animation-delay:-${delay}s;pointer-events:none;`
-      if (p.top) el.style.top = p.top
-      if (p.left) el.style.left = p.left
-      if (p.right) el.style.right = p.right
-      el.textContent = foods[i % foods.length]
-      container.appendChild(el)
-      icons.push(el)
-    })
-    const interval = setInterval(() => {
-      const idx = Math.floor(Math.random() * icons.length)
-      const el = icons[idx]
-      if (parseFloat(window.getComputedStyle(el).opacity) < 0.05) {
-        el.textContent = foods[Math.floor(Math.random() * foods.length)]
-      }
-    }, 3000)
-    return () => { clearInterval(interval); if (container) container.innerHTML = '' }
-  }, [])
+const CATEGORY_STYLE: Record<string, { bg: string; emoji: string }> = {
+  한식: { bg: '#0f0e23', emoji: '🍜' },
+  중식: { bg: '#0f0e23', emoji: '🥟' },
+  일식: { bg: '#0a0a1a', emoji: '🍱' },
+  분식: { bg: '#13100a', emoji: '🍢' },
+  카페: { bg: '#0d1530', emoji: '☕' },
+  양식: { bg: '#0a1520', emoji: '🍝' },
+  기타: { bg: '#0f0e23', emoji: '🍽️' },
+}
 
+function StarRow({ rating }: { rating: number }) {
+  const filled = Math.round(rating)
   return (
-    <>
-      <style>{`
-        @keyframes foodFloatGlow {
-          0%   { transform:translateY(0) rotate(0deg);    opacity:0;    filter:drop-shadow(0 0 0px  rgba(99,102,241,0));   }
-          15%  { transform:translateY(-5px) rotate(2deg); opacity:0.35; filter:drop-shadow(0 0 8px  rgba(99,102,241,.55)); }
-          45%  { transform:translateY(-18px) rotate(7deg);opacity:0.55; filter:drop-shadow(0 0 14px rgba(99,102,241,.8));  }
-          70%  { transform:translateY(-10px) rotate(4deg);opacity:0.3;  filter:drop-shadow(0 0 6px  rgba(99,102,241,.4));  }
-          85%  { transform:translateY(-3px) rotate(1deg); opacity:0;    filter:drop-shadow(0 0 0px  rgba(99,102,241,0));   }
-          100% { transform:translateY(0) rotate(0deg);    opacity:0;    filter:drop-shadow(0 0 0px  rgba(99,102,241,0));   }
-        }
-      `}</style>
-      <div id="food-icons" style={{ position:'absolute', inset:0, pointerEvents:'none', overflow:'hidden', zIndex:1 }} />
-    </>
+    <span>
+      {[1,2,3,4,5].map(i => (
+        <span key={i} style={{ color: i <= filled ? '#f59e0b' : '#1e1b4b', fontSize: 12 }}>★</span>
+      ))}
+    </span>
   )
 }
+
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ category?: string }>
+}) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const params = await searchParams
+  const category = params?.category
+  const restaurants = await getRestaurants(category)
+  const totalReviews = restaurants.reduce((s, r) => s + r.review_count, 0)
+  const ratedRestaurants = restaurants.filter(r => r.avg_rating)
+  const avgRating = ratedRestaurants.length > 0
+    ? (ratedRestaurants.reduce((s, r) => s + (r.avg_rating ?? 0), 0) / ratedRestaurants.length).toFixed(1)
+    : '-'
+
+  retu
